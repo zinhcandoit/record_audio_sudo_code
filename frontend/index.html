@@ -63,9 +63,9 @@
 
         <!-- Quick Actions -->
         <div class="flex items-center space-x-3">
-          <a id="btn-download-zip" href="#" class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg text-slate-700 bg-slate-100 hover:bg-slate-200 transition">
-            <i data-lucide="download" class="w-4 h-4 mr-2"></i> Tải file ZIP
-          </a>
+          <button id="btn-download-zip" class="inline-flex items-center px-4 py-2 text-sm font-semibold rounded-xl transition duration-150 shadow-xs" title="Nút tải file .zip chỉ có hiệu lực sau khi kích hoạt thẩm định ASR lần đầu tiên">
+            <i data-lucide="download" class="w-4 h-4 mr-2"></i> Tải file .zip
+          </button>
           <button id="btn-reset-reader" class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg text-rose-600 hover:bg-rose-50 transition" title="Xóa các bản thu để thu lại từ đầu">
             <i data-lucide="trash-2" class="w-4 h-4 mr-1"></i> Làm mới
           </button>
@@ -128,10 +128,15 @@
         <span class="ml-1">Thu âm đủ 100% lượt • RapidFuzz ≥ 0.85 (85%) • WPM ≥ 4.0 (Tiếng Việt)</span>
       </div>
 
-      <button id="btn-confirm-all" class="w-full sm:w-auto inline-flex items-center justify-center px-8 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md hover:shadow-lg transition">
-        <i data-lucide="check-circle" class="w-5 h-5 mr-2"></i>
-        Xác nhận & Kiểm tra toàn bộ
-      </button>
+      <div class="flex items-center space-x-3 w-full sm:w-auto justify-end">
+        <button id="btn-download-zip-bottom" class="inline-flex items-center justify-center px-5 py-3 rounded-xl font-semibold text-sm transition shadow-md" title="Nút tải file .zip chỉ có hiệu lực sau khi kích hoạt thẩm định ASR lần đầu tiên">
+          <i data-lucide="download" class="w-5 h-5 mr-2"></i> Tải file .zip
+        </button>
+        <button id="btn-confirm-all" class="w-full sm:w-auto inline-flex items-center justify-center px-8 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md hover:shadow-lg transition">
+          <i data-lucide="check-circle" class="w-5 h-5 mr-2"></i>
+          Xác nhận & Kiểm tra toàn bộ
+        </button>
+      </div>
     </div>
   </footer>
 

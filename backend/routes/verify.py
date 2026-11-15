@@ -56,6 +56,7 @@ async def verify_turn(
         raise HTTPException(status_code=500, detail=f"Lỗi chuyển đổi âm thanh: {str(e)}")
 
     # 2. Evaluate via OpenAI Whisper ASR + RapidFuzz + Vietnamese WPM
+    eval_result = None
     try:
         eval_result = evaluate_recording(
             ground_truth=ground_truth,
@@ -67,32 +68,46 @@ async def verify_turn(
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         logger.error(f"Evaluation error: {e}")
-        raise HTTPException(status_code=500, detail=f"Lỗi kiểm tra ASR / đánh giá âm thanh: {str(e)}")
+        # Even if Whisper API fails, keep the audio and record error
+        eval_result = {
+            "asr_transcript": f"[Lỗi Whisper: {str(e)}]",
+            "score": 0.0,
+            "score_percent": 0.0,
+            "score_passed": False,
+            "passed": False,
+            "wpm": 0.0,
+            "wpm_passed": False,
+            "word_count": 0,
+            "duration_seconds": duration_sec,
+            "reasons": [f"Lỗi Whisper ASR: {str(e)}"]
+        }
 
     is_passed = eval_result["passed"]
 
-    # 3. If passed, save to staging only (DO NOT SAVE TO MONGODB YET!)
-    # Only committed to MongoDB when ALL N/N turns pass and are confirmed!
-    if is_passed:
-        metadata = {
-            "filename": expected_filename,
-            "reader_id": reader_id,
-            "reader_name": reader_info.get("name"),
-            "dialogue_id": dialogue_id,
-            "turn_idx": turn_idx,
-            "speaker": turn_item["speaker"],
-            "role": turn_item["role"],
-            "gender": turn_item["gender"],
-            "region": turn_item["region"],
-            "ground_truth_text": ground_truth,
-            "asr_transcript": eval_result["asr_transcript"],
-            "rapidfuzz_score": eval_result["score"],
-            "wpm": eval_result["wpm"],
-            "word_count": eval_result["word_count"],
-            "duration_seconds": eval_result["duration_seconds"],
-            "status": "passed"
-        }
-        db_manager.save_staging_turn(reader_id, metadata, mp3_bytes)
+    # 3. Save to staging (DO NOT SAVE TO MONGODB YET!)
+    # Always save staged MP3 and metadata so the user can download .zip with the given
+    # naming convention even if Whisper hallucinated or some checks failed.
+    # Note: Only committed to MongoDB when ALL N/N turns have status="passed".
+    metadata = {
+        "filename": expected_filename,
+        "reader_id": reader_id,
+        "reader_name": reader_info.get("name"),
+        "dialogue_id": dialogue_id,
+        "turn_idx": turn_idx,
+        "speaker": turn_item["speaker"],
+        "role": turn_item["role"],
+        "gender": turn_item["gender"],
+        "region": turn_item["region"],
+        "ground_truth_text": ground_truth,
+        "asr_transcript": eval_result.get("asr_transcript", ""),
+        "rapidfuzz_score": eval_result.get("score", 0.0),
+        "wpm": eval_result.get("wpm", 0.0),
+        "word_count": eval_result.get("word_count", 0),
+        "duration_seconds": eval_result.get("duration_seconds", duration_sec),
+        "status": "passed" if is_passed else "failed",
+        "reasons": eval_result.get("reasons", [])
+    }
+    db_manager.save_staging_turn(reader_id, metadata, mp3_bytes)
 
     return {
         "dialogue_id": dialogue_id,

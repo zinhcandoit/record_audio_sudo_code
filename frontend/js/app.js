@@ -7,6 +7,8 @@ const state = {
   turns: [],
   activeRecordingTurnId: null, // e.g. "D01_02"
   isVerifying: false,
+  hasVerifiedOnce: false,
+  verifiedReaders: new Set(),
 };
 
 // Format seconds into MM:SS
@@ -34,6 +36,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   document.getElementById("btn-confirm-all").addEventListener("click", handleConfirmAndVerify);
   document.getElementById("btn-reset-reader").addEventListener("click", handleResetReader);
+
+  const btnZip = document.getElementById("btn-download-zip");
+  if (btnZip) btnZip.addEventListener("click", handleDownloadZip);
+
+  const btnZipBottom = document.getElementById("btn-download-zip-bottom");
+  if (btnZipBottom) btnZipBottom.addEventListener("click", handleDownloadZip);
 });
 
 // Load System Status
@@ -136,9 +144,15 @@ async function selectReader(readerId) {
       localAudioUrl: null,
     }));
 
+    const hasExistingVerified = state.turns.some(
+      (t) => t.status === "passed" || t.status === "failed" || t.asr_transcript
+    );
+    state.hasVerifiedOnce = hasExistingVerified || state.verifiedReaders.has(readerId);
+
     renderReaderInfo();
     renderTurns();
     updateProgressSummary();
+    updateZipButtons();
   } catch (err) {
     showToast(err.message, "error");
   }
@@ -152,10 +166,70 @@ function renderReaderInfo() {
   document.getElementById("reader-meta-gender").textContent = r.gender === "f" ? "Nữ" : "Nam";
   document.getElementById("reader-meta-region").textContent =
     r.region === "bac" ? "Bắc" : r.region === "nam" ? "Nam" : "Trung";
+}
 
-  // ZIP download button link
-  const btnZip = document.getElementById("btn-download-zip");
-  btnZip.href = API.getZipExportUrl(state.currentReaderId);
+// Update ZIP Buttons state (Enabled only after first ASR verification)
+function updateZipButtons() {
+  const isEnabled = state.hasVerifiedOnce;
+  const buttons = [
+    document.getElementById("btn-download-zip"),
+    document.getElementById("btn-download-zip-bottom"),
+  ].filter(Boolean);
+
+  buttons.forEach((btn) => {
+    if (isEnabled) {
+      btn.disabled = false;
+      if (btn.id === "btn-download-zip-bottom") {
+        btn.className = "inline-flex items-center justify-center px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md hover:shadow-lg transition cursor-pointer transform active:scale-95";
+      } else {
+        btn.className = "inline-flex items-center px-4 py-2 text-sm font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-sm hover:shadow cursor-pointer transform active:scale-95";
+      }
+      btn.title = "Tải file .zip chứa các file âm thanh đã thu theo đúng quy cách đặt tên (D<XX>_YY_f_bac_<vai>.mp3)";
+      btn.innerHTML = `<i data-lucide="download" class="w-4 h-4 mr-2"></i> Tải file .zip`;
+    } else {
+      btn.disabled = true;
+      if (btn.id === "btn-download-zip-bottom") {
+        btn.className = "inline-flex items-center justify-center px-5 py-3 rounded-xl bg-slate-100 text-slate-400 border border-slate-200 text-sm font-medium cursor-not-allowed opacity-60";
+      } else {
+        btn.className = "inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60";
+      }
+      btn.title = "Nút tải file .zip chỉ có hiệu lực sau khi bạn kích hoạt Xác nhận & Kiểm tra ASR lần đầu tiên.";
+      btn.innerHTML = `<i data-lucide="lock" class="w-4 h-4 mr-2 text-slate-400"></i> Tải file .zip`;
+    }
+  });
+
+  if (window.lucide) lucide.createIcons();
+}
+
+// Handle ZIP Download Action
+async function handleDownloadZip() {
+  if (!state.hasVerifiedOnce) {
+    showToast("Nút tải file .zip chỉ có hiệu lực sau khi kích hoạt thẩm định ASR lần đầu tiên!", "warning");
+    return;
+  }
+
+  showToast("Đang chuẩn bị gói nén file .zip cho các bản thu...", "info");
+  const downloadUrl = API.getZipExportUrl(state.currentReaderId);
+
+  try {
+    const res = await fetch(downloadUrl);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Không thể tải file .zip");
+    }
+    const blob = await res.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = `recordings_${state.currentReaderId}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(blobUrl);
+    showToast("Đã tải file .zip thành công!", "success");
+  } catch (err) {
+    showToast(`Lỗi tải ZIP: ${err.message}`, "error");
+  }
 }
 
 // Update Progress Summary
@@ -484,6 +558,11 @@ async function handleConfirmAndVerify() {
   openModal("Đang kiểm tra ASR & Đánh giá chất lượng", turnsToVerify.length);
   state.isVerifying = true;
 
+  // Activate ZIP download button as soon as user triggers verify ASR for the first time
+  state.hasVerifiedOnce = true;
+  state.verifiedReaders.add(state.currentReaderId);
+  updateZipButtons();
+
   let passedCount = 0;
   let failedCount = 0;
 
@@ -562,6 +641,8 @@ async function handleResetReader() {
 
   try {
     await API.resetReader(state.currentReaderId);
+    state.verifiedReaders.delete(state.currentReaderId);
+    state.hasVerifiedOnce = false;
     showToast("Đã đặt lại dữ liệu bản thu thành công!", "info");
     await selectReader(state.currentReaderId);
   } catch (err) {

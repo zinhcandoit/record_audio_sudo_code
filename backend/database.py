@@ -376,6 +376,36 @@ class DatabaseManager:
                 return json.load(f)
         return []
 
+    def get_all_available_recordings_for_reader(self, reader_id: str) -> List[Dict[str, Any]]:
+        """
+        Returns all recordings for reader, prioritizing officially committed ones,
+        and including staged recordings (from verification) so that the user can download
+        the ZIP even if Whisper hallucinated or verification failed some turns.
+        """
+        recordings_map = {}
+
+        # 1. Committed recordings from MongoDB or local storage
+        committed = self.get_recordings_by_reader(reader_id)
+        for c in committed:
+            recordings_map[c["filename"]] = c
+
+        # 2. Staged recordings (from ASR verification)
+        staged = self.get_staging_turns(reader_id)
+        for fn, meta in staged.items():
+            if fn not in recordings_map:
+                recordings_map[fn] = meta
+
+        # Sort by filename
+        return sorted(recordings_map.values(), key=lambda x: x.get("filename", ""))
+
+    def get_all_available_recordings(self) -> List[Dict[str, Any]]:
+        """Returns all available recordings (committed + staged) across all readers."""
+        all_records = []
+        readers = self.get_readers()
+        for r in readers:
+            all_records.extend(self.get_all_available_recordings_for_reader(r["id"]))
+        return all_records
+
     def reset_reader_recordings(self, reader_id: str):
         """Clears all recordings for a specific reader (for re-testing)."""
         # MongoDB

@@ -36,29 +36,45 @@ def stream_recording_audio(filename: str):
 @router.get("/export/zip")
 def export_recordings_zip(reader_id: str = None):
     """
-    Creates a ZIP archive containing all passed MP3 files and their metadata JSON.
+    Creates a ZIP archive containing all recorded MP3 files with the specified naming convention
+    (D<XX>_YY_<gender>_<region>_<role>.mp3) and metadata JSON.
+    Includes both finalized/committed recordings and staged recordings from ASR verification.
     """
     if reader_id:
-        recordings = db_manager.get_recordings_by_reader(reader_id)
+        recordings = db_manager.get_all_available_recordings_for_reader(reader_id)
         zip_filename = f"recordings_{reader_id}.zip"
     else:
-        recordings = db_manager.get_all_recordings()
+        recordings = db_manager.get_all_available_recordings()
         zip_filename = "all_recordings.zip"
 
     if not recordings:
-        raise HTTPException(status_code=404, detail="Chưa có bản thu âm nào hoàn tất để tải về")
+        raise HTTPException(
+            status_code=400,
+            detail="Chưa có file thu âm nào để đóng gói ZIP. Vui lòng bấm 'Xác nhận & Kiểm tra toàn bộ' để kích hoạt thẩm định ASR ít nhất một lần."
+        )
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        files_added = 0
         for rec in recordings:
             fn = rec.get("filename")
+            if not fn:
+                continue
             audio_bytes = db_manager.get_recording_audio(fn)
             if audio_bytes:
                 zip_file.writestr(fn, audio_bytes)
+                files_added += 1
 
-        # Also include metadata JSON
+        if files_added == 0:
+            raise HTTPException(
+                status_code=404,
+                detail="Không tìm thấy file âm thanh để đóng gói ZIP."
+            )
+
+        # Also include metadata JSON (clean binary data)
         import json
-        zip_file.writestr("metadata.json", json.dumps(recordings, ensure_ascii=False, indent=2))
+        clean_records = [{k: v for k, v in r.items() if k != "audio_data"} for r in recordings]
+        zip_file.writestr("metadata.json", json.dumps(clean_records, ensure_ascii=False, indent=2))
 
     zip_buffer.seek(0)
     return StreamingResponse(
