@@ -39,33 +39,65 @@ class DatabaseManager:
             with open(self.local_recordings_file, "w", encoding="utf-8") as f:
                 json.dump([], f, ensure_ascii=False, indent=2)
 
-    def connect(self):
-        """Attempts to connect to MongoDB."""
+    def get_public_ip(self) -> str:
+        try:
+            import requests
+            resp = requests.get("https://api.ipify.org", timeout=3)
+            if resp.status_code == 200:
+                return resp.text.strip()
+        except Exception:
+            pass
+        return "Unknown"
+
+    def connect(self) -> bool:
+        """Attempts to connect to MongoDB with automatic fallbacks."""
         import os
         uri = os.getenv("MONGODB_URI", MONGODB_URI)
-        scripts_db_name = os.getenv("DB_NAME_SCRIPTS", DB_NAME_SCRIPTS)
-        recordings_db_name = os.getenv("DB_NAME_RECORDINGS", DB_NAME_RECORDINGS)
+        if uri:
+            uri = uri.strip().strip("'\"")
+        scripts_db_name = os.getenv("DB_NAME_SCRIPTS", DB_NAME_SCRIPTS).strip().strip("'\"")
+        recordings_db_name = os.getenv("DB_NAME_RECORDINGS", DB_NAME_RECORDINGS).strip().strip("'\"")
 
         if not uri:
             self.is_connected = False
             self.connection_error = "MONGODB_URI chưa được thiết lập trong biến môi trường (.env)"
             logger.warning(self.connection_error)
-            return
+            return False
 
-        try:
-            self.client = MongoClient(uri, serverSelectionTimeoutMS=5000, tlsCAFile=certifi.where())
-            # Ping database to confirm connection
-            self.client.admin.command("ping")
-            self.scripts_db = self.client[scripts_db_name]
-            self.recordings_db = self.client[recordings_db_name]
-            self.fs = gridfs.GridFS(self.recordings_db)
-            self.is_connected = True
-            self.connection_error = None
-            logger.info(f"MongoDB connected successfully! Scripts DB: '{scripts_db_name}', Recordings DB: '{recordings_db_name}'")
-        except Exception as e:
+        connected = False
+        last_err = None
+        for attempt_name, client_opts in [
+            ("TLS with certifi CA bundle", {"tlsCAFile": certifi.where()}),
+            ("TLS with relaxed certificate validation", {"tls": True, "tlsAllowInvalidCertificates": True}),
+        ]:
+            try:
+                client = MongoClient(uri, serverSelectionTimeoutMS=5000, **client_opts)
+                client.admin.command("ping")
+                self.client = client
+                self.scripts_db = self.client[scripts_db_name]
+                self.recordings_db = self.client[recordings_db_name]
+                self.fs = gridfs.GridFS(self.recordings_db)
+                self.is_connected = True
+                self.connection_error = None
+                logger.info(f"MongoDB connected successfully ({attempt_name})! Scripts DB: '{scripts_db_name}', Recordings DB: '{recordings_db_name}'")
+                connected = True
+                break
+            except Exception as e:
+                last_err = e
+
+        if not connected:
             self.is_connected = False
-            self.connection_error = str(e)
-            logger.warning(f"Could not connect to MongoDB: {e}. Running in local storage fallback mode.")
+            self.connection_error = str(last_err)
+            server_ip = self.get_public_ip()
+            logger.warning(
+                f"Could not connect to MongoDB: {last_err}.\n"
+                f"==> Lưu ý: Nếu dùng MongoDB Atlas, IP máy chủ hiện tại ({server_ip}) "
+                f"phải được cấp quyền trong 'Network Access' (hoặc thêm '0.0.0.0/0'). "
+                f"Running in local storage fallback mode."
+            )
+            return False
+
+        return True
 
     def seed_scripts_database(self, force: bool = False):
         """

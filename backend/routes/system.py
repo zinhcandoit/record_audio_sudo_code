@@ -22,6 +22,14 @@ def health_check():
 @router.api_route("/status", methods=["GET", "HEAD"])
 def get_system_status():
     """Returns the operational status of all backend subsystems."""
+    # If not connected, give it another chance to connect in case Atlas whitelist was updated
+    if not db_manager.is_connected:
+        db_manager.connect()
+        if db_manager.is_connected:
+            try:
+                db_manager.seed_scripts_database(force=False)
+            except Exception:
+                pass
     ffmpeg_exe = get_ffmpeg_executable()
 
     masked_key = ""
@@ -31,11 +39,14 @@ def get_system_status():
         else:
             masked_key = "***"
 
+    outbound_ip = db_manager.get_public_ip() if not db_manager.is_connected else None
+
     mongo_info = {
         "connected": db_manager.is_connected,
         "scripts_db": DB_NAME_SCRIPTS,
         "recordings_db": DB_NAME_RECORDINGS,
         "error": db_manager.connection_error,
+        "outbound_ip": outbound_ip,
     }
 
     if db_manager.is_connected and db_manager.scripts_db is not None:
@@ -67,5 +78,21 @@ def get_system_status():
             "rapidfuzz_min_percent": RAPIDFUZZ_SCORE_THRESHOLD * 100,
             "wpm_min": WPM_MIN_THRESHOLD
         }
+    }
+
+
+@router.post("/reconnect-db")
+def reconnect_database():
+    """Triggers an on-demand database reconnection attempt."""
+    success = db_manager.connect()
+    if success:
+        try:
+            db_manager.seed_scripts_database(force=False)
+        except Exception:
+            pass
+    return {
+        "connected": db_manager.is_connected,
+        "error": db_manager.connection_error,
+        "outbound_ip": db_manager.get_public_ip()
     }
 

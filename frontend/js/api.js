@@ -7,6 +7,14 @@ const API = {
     return await res.json();
   },
 
+  async reconnectDB() {
+    const res = await fetch(`${this.baseUrl}/api/system/reconnect-db`, {
+      method: "POST"
+    });
+    if (!res.ok) throw new Error("Không thể gửi yêu cầu kết nối lại database");
+    return await res.json();
+  },
+
   async getReaders() {
     const res = await fetch(`${this.baseUrl}/api/readers`);
     if (!res.ok) throw new Error("Không thể tải danh sách người đọc");

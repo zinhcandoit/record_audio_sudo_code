@@ -47,9 +47,40 @@ async function loadSystemStatus() {
     if (data.mongodb.connected) {
       mongoPill.className = "badge bg-emerald-100 text-emerald-800 border border-emerald-300";
       mongoPill.innerHTML = `● MongoDB: Đã kết nối (${data.mongodb.scripts_db} / ${data.mongodb.recordings_db})`;
+      mongoPill.onclick = null;
+      mongoPill.style.cursor = "default";
+      mongoPill.title = "MongoDB đã kết nối thành công!";
     } else {
-      mongoPill.className = "badge bg-amber-100 text-amber-800 border border-amber-300";
-      mongoPill.innerHTML = `● MongoDB: Chưa kết nối (Chế độ cục bộ)`;
+      mongoPill.className = "badge bg-rose-100 text-rose-800 border border-rose-300 cursor-pointer hover:bg-rose-200 transition";
+      const ipStr = data.mongodb.outbound_ip ? ` (IP: ${data.mongodb.outbound_ip})` : "";
+      mongoPill.innerHTML = `⚠️ MongoDB chưa kết nối 🔄 Bấm để thử lại`;
+      mongoPill.title = `Lỗi: ${data.mongodb.error || "Chưa cấp quyền IP"}. Bấm để thử kết nối lại.`;
+      mongoPill.onclick = async () => {
+        mongoPill.innerHTML = `⏳ Đang thử kết nối lại...`;
+        try {
+          const rec = await API.reconnectDB();
+          if (rec.connected) {
+            showToast("Kết nối MongoDB Atlas thành công!", "success");
+            await loadSystemStatus();
+            await loadReaders();
+          } else {
+            const ipNote = rec.outbound_ip ? `\nIP máy chủ Render: ${rec.outbound_ip}` : "";
+            alert(
+              `Chưa thể kết nối tới MongoDB Atlas!\n\n` +
+              `Chi tiết: ${rec.error}\n` +
+              `${ipNote}\n\n` +
+              `👉 CÁCH KHẮC PHỤC:\n` +
+              `1. Vào MongoDB Atlas > Network Access\n` +
+              `2. Chọn '+ Add IP Address' > Chọn 'ALLOW ACCESS FROM ANYWHERE' (0.0.0.0/0)\n` +
+              `3. Nhấn 'Confirm', đợi 30 giây rồi bấm lại nút này!`
+            );
+            await loadSystemStatus();
+          }
+        } catch (e) {
+          showToast(`Lỗi: ${e.message}`, "error");
+          await loadSystemStatus();
+        }
+      };
     }
 
     // OpenAI Whisper Pill
