@@ -14,7 +14,12 @@ from backend.audio_processor import get_ffmpeg_executable
 router = APIRouter(prefix="/api/system", tags=["System"])
 
 
-@router.get("/status")
+@router.api_route("/health", methods=["GET", "HEAD"])
+def health_check():
+    return {"status": "ok"}
+
+
+@router.api_route("/status", methods=["GET", "HEAD"])
 def get_system_status():
     """Returns the operational status of all backend subsystems."""
     ffmpeg_exe = get_ffmpeg_executable()

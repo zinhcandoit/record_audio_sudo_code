@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Any, Tuple
 from pymongo import MongoClient, ASCENDING
 import gridfs
 from bson import ObjectId, Binary
+import certifi
 
 from backend.config import (
     MONGODB_URI,
@@ -52,7 +53,7 @@ class DatabaseManager:
             return
 
         try:
-            self.client = MongoClient(uri, serverSelectionTimeoutMS=4000)
+            self.client = MongoClient(uri, serverSelectionTimeoutMS=5000, tlsCAFile=certifi.where())
             # Ping database to confirm connection
             self.client.admin.command("ping")
             self.scripts_db = self.client[scripts_db_name]
