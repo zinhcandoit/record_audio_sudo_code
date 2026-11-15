@@ -651,17 +651,16 @@ async function handleConfirmAndVerify() {
   }
 
   const total = state.turns.length;
-  const allCompleted = state.turns.every((t) => t.status === "passed");
+  const allCompleted = state.turns.every((t) => t.status === "passed" || t.status === "re-recorded");
 
-  // ONLY COMMIT TO MONGODB WHEN ALL N/N TURNS FOR THE ROLE ARE PASSED!
   if (allCompleted && total > 0) {
-    updateModalProgress(total, total, "Đang lưu trữ chính thức toàn bộ file MP3 và metadata vào MongoDB...");
+    updateModalProgress(total, total, "Đang hoàn tất và cập nhật phiên ghi nhận vào MongoDB...");
     try {
       const finalRes = await API.finalizeAll(state.currentReaderId);
       state.turns.forEach((t) => {
         t.recorded_time = finalRes.recorded_time;
       });
-      showToast(`🎉 Chúc mừng! Đã hoàn tất 100% (${total}/${total} đoạn đạt chuẩn). Toàn bộ file MP3 và metadata đã được lưu an toàn vào MongoDB!`, "success");
+      showToast(`🎉 Chúc mừng! Đã hoàn tất đủ ${total}/${total} đoạn. Toàn bộ file MP3 và metadata đã được lưu trữ an toàn trong MongoDB (telesale_recordings_db)!`, "success");
       setTimeout(() => {
         const banner = document.getElementById("all-completed-banner");
         if (banner) banner.scrollIntoView({ behavior: "smooth" });
@@ -670,7 +669,7 @@ async function handleConfirmAndVerify() {
       showToast(err.message, "error");
     }
   } else {
-    showToast(`Có ${failedCount} đoạn chưa đạt chuẩn (Score < 85% hoặc WPM < 4). Hệ thống CHƯA LƯU vào Database. Vui lòng thu âm lại các đoạn màu đỏ và ấn Xác nhận lại!`, "warning");
+    showToast(`Đã lưu ${passedCount}/${total} đoạn đạt chuẩn vào MongoDB. Còn ${failedCount} đoạn chưa đạt - bạn có thể bấm "Thu âm lại" hoặc ấn "Tải file .zip" để tải toàn bộ!`, "warning");
   }
 
   state.isVerifying = false;

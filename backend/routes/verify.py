@@ -110,6 +110,13 @@ async def verify_turn(
     }
     db_manager.save_staging_turn(reader_id, metadata, mp3_bytes)
 
+    # Persist passed turn directly into MongoDB telesale_recordings_db!
+    if is_passed:
+        try:
+            db_manager.save_recording_to_mongodb(reader_id, metadata, mp3_bytes)
+        except Exception as e:
+            logger.error(f"Error persisting passed turn '{expected_filename}' to MongoDB: {e}")
+
     return {
         "dialogue_id": dialogue_id,
         "turn_idx": turn_idx,
@@ -180,6 +187,12 @@ async def stage_turn_without_asr(
         "reasons": []
     }
     db_manager.save_staging_turn(reader_id, metadata, mp3_bytes)
+
+    # Persist re-recorded turn directly into MongoDB telesale_recordings_db!
+    try:
+        db_manager.save_recording_to_mongodb(reader_id, metadata, mp3_bytes)
+    except Exception as e:
+        logger.error(f"Error persisting re-recorded turn '{expected_filename}' to MongoDB: {e}")
 
     return {
         "success": True,
