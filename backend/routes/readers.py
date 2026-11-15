@@ -77,6 +77,7 @@ def get_reader_turns(reader_id: str):
             turn_data["duration"] = rec.get("duration_seconds")
             turn_data["asr_transcript"] = rec.get("asr_transcript")
             turn_data["recorded_time"] = rec.get("recorded_time") or rec.get("updated_at")
+            turn_data["is_committed"] = (filename in recordings_map)
         else:
             all_passed = False
 
@@ -84,6 +85,8 @@ def get_reader_turns(reader_id: str):
 
     total_turns = len(turns)
     completed_turns = sum(1 for t in turns if t["status"] == "passed")
+    committed_turns = len(recordings_map)
+    is_committed_all = (committed_turns == total_turns and total_turns > 0)
 
     return {
         "reader_id": reader_id,
@@ -93,6 +96,8 @@ def get_reader_turns(reader_id: str):
         "role_description": reader_info.get("role_description"),
         "total_turns": total_turns,
         "completed_turns": completed_turns,
+        "committed_turns": committed_turns,
+        "is_committed_all": is_committed_all,
         "all_passed": all_passed and total_turns > 0,
         "turns": turns
     }

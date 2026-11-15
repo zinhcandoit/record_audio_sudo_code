@@ -212,76 +212,16 @@ class DatabaseManager:
                 pass
         return result
 
-    def save_recording_to_mongodb(self, reader_id: str, metadata: Dict[str, Any], mp3_bytes: bytes) -> str:
-        """
-        Immediately persists a recording to MongoDB telesale_recordings_db:
-        1. In GridFS (audio/mpeg)
-        2. In recordings collection WITH raw audio_data (BSON Binary) and full metadata.
-        Guarantees that no recording is ever lost, even on Render ephemeral restarts.
-        """
-        if not self.is_connected or self.recordings_db is None or self.fs is None:
-            self.connect()
-
-        filename = metadata["filename"]
-        commit_time = metadata.get("recorded_time") or datetime.now(timezone.utc).isoformat()
-        metadata["recorded_time"] = commit_time
-        metadata["updated_at"] = commit_time
-        metadata["file_size_bytes"] = len(mp3_bytes)
-        metadata["audio_format"] = "mp3"
-        metadata["audio_mime_type"] = "audio/mpeg"
-
-        # Also save to local storage backup
-        local_mp3 = STORAGE_DIR / "mp3" / filename
-        with open(local_mp3, "wb") as f:
-            f.write(mp3_bytes)
-        self._update_local_recordings_json(metadata)
-
-        # Save to MongoDB
-        if self.is_connected and self.recordings_db is not None and self.fs is not None:
-            try:
-                # Remove previous GridFS file if exists
-                old_file = self.recordings_db["fs.files"].find_one({"filename": filename})
-                if old_file:
-                    self.fs.delete(old_file["_id"])
-
-                # 1. Put into GridFS
-                gridfs_id = self.fs.put(
-                    mp3_bytes,
-                    filename=filename,
-                    content_type="audio/mpeg",
-                    reader_id=reader_id,
-                    dialogue_id=metadata.get("dialogue_id"),
-                    turn_idx=metadata.get("turn_idx"),
-                    recorded_time=commit_time
-                )
-                metadata["gridfs_id"] = str(gridfs_id)
-
-                # 2. Put into recordings collection WITH audio_data Binary
-                doc_to_save = dict(metadata)
-                doc_to_save["audio_data"] = Binary(mp3_bytes)
-
-                self.recordings_db["recordings"].replace_one(
-                    {"filename": filename},
-                    doc_to_save,
-                    upsert=True
-                )
-                logger.info(f"Successfully recorded '{filename}' into MongoDB 'telesale_recordings_db' (GridFS + recordings doc)!")
-                return str(gridfs_id)
-            except Exception as e:
-                logger.error(f"Failed to write '{filename}' to MongoDB: {e}")
-                self.is_connected = False
-                self.connection_error = str(e)
-                raise RuntimeError(f"Lỗi lưu trữ MongoDB: {e}")
-
-        raise RuntimeError("MongoDB chưa được kết nối! Vui lòng kiểm tra quyền truy cập mạng của MongoDB Atlas.")
-
     def commit_completed_session(self, reader_id: str) -> Dict[str, Any]:
         """
-        COMMITS TO MONGODB WHEN ALL N/N TURNS FOR THE ROLE ARE COMPLETED.
+        COMMITS TO MONGODB WHEN ALL N/N TURNS FOR THE ROLE ARE COMPLETED AND VERIFIED.
         Saves BOTH the metadata and the raw MP3 binary data (in GridFS + audio_data BSON field).
-        Strictly raises an error if MongoDB is not reachable (never silently bypasses).
+        MANDATORY: Strictly connects to MongoDB and writes each document into telesale_recordings_db.
+        If MongoDB fails to connect or write, MUST RAISE AN EXCEPTION so the user knows immediately.
         """
-        if not self.is_connected or self.recordings_db is None or self.fs is None:
+        # 1. ALWAYS ENSURE ACTIVE CONNECTION TO MONGODB!
+        if not self.is_connected or self.client is None or self.recordings_db is None or self.fs is None:
+            logger.info("Connecting to MongoDB before committing session...")
             self.connect()
 
         if not self.is_connected or self.recordings_db is None or self.fs is None:
@@ -291,6 +231,15 @@ class DatabaseManager:
                 f"Vui lòng kiểm tra IP Access List trên MongoDB Atlas (thêm 0.0.0.0/0) và thử lại."
             )
 
+        # Verify active connection with ping
+        try:
+            self.client.admin.command("ping")
+        except Exception as e:
+            logger.warning(f"MongoDB ping failed: {e}. Reconnecting...")
+            self.connect()
+            if not self.is_connected or self.recordings_db is None or self.fs is None:
+                raise RuntimeError(f"LỖI KẾT NỐI MONGODB: Mất kết nối tới database: {e}")
+
         reader_info = self.get_reader_turns(reader_id)
         if not reader_info:
             raise ValueError(f"Không tìm thấy người đọc '{reader_id}'")
@@ -299,42 +248,47 @@ class DatabaseManager:
         total_required = len(assigned_turns)
         staging_dir = STORAGE_DIR / "staging" / reader_id
 
-        # Also collect from existing MongoDB recordings in case some were saved directly
-        existing_recordings = {r["filename"]: r for r in self.get_recordings_by_reader(reader_id)}
-
+        # 2. Gather all N turns (from staging or existing MongoDB recordings)
         staged_items = []
         missing = []
+        existing_in_db = {r["filename"]: r for r in self.get_recordings_by_reader(reader_id)}
+
         for t in assigned_turns:
             fn = t["filename"]
-            mp3_path = staging_dir / fn if staging_dir.exists() else None
-            meta_path = staging_dir / f"{fn}.json" if staging_dir.exists() else None
+            mp3_bytes = None
+            meta = None
 
-            if mp3_path and mp3_path.exists() and meta_path and meta_path.exists():
-                with open(mp3_path, "rb") as f:
-                    mp3_bytes = f.read()
-                with open(meta_path, "r", encoding="utf-8") as f:
-                    meta = json.load(f)
-                if meta.get("status") not in ["passed", "re-recorded"]:
-                    missing.append(fn)
-                    continue
-                staged_items.append((meta, mp3_bytes))
-            elif fn in existing_recordings:
-                # Already in MongoDB
-                audio_bytes = self.get_recording_audio(fn)
-                if audio_bytes:
-                    staged_items.append((existing_recordings[fn], audio_bytes))
-                else:
-                    missing.append(fn)
-            else:
+            # Check staging
+            if staging_dir.exists():
+                mp3_path = staging_dir / fn
+                meta_path = staging_dir / f"{fn}.json"
+                if mp3_path.exists() and meta_path.exists():
+                    try:
+                        with open(mp3_path, "rb") as f:
+                            mp3_bytes = f.read()
+                        with open(meta_path, "r", encoding="utf-8") as f:
+                            meta = json.load(f)
+                    except Exception:
+                        pass
+
+            # If not in staging, check if already in MongoDB / local storage
+            if not mp3_bytes and fn in existing_in_db:
+                meta = existing_in_db[fn]
+                mp3_bytes = self.get_recording_audio(fn)
+
+            if not mp3_bytes or not meta:
                 missing.append(fn)
+                continue
+
+            staged_items.append((meta, mp3_bytes))
 
         if missing or len(staged_items) != total_required:
             raise ValueError(
                 f"Chỉ lưu vào Database khi hoàn tất đủ {total_required}/{total_required} đoạn đạt chuẩn! "
-                f"Còn thiếu hoặc chưa đạt ({len(missing)} đoạn): {missing}"
+                f"Còn thiếu ({len(missing)} đoạn): {missing}"
             )
 
-        # 2. All N/N turns are present -> Commit to MongoDB!
+        # 3. WRITE EVERY SINGLE TURN INTO MONGODB telesale_recordings_db
         commit_time = datetime.now(timezone.utc).isoformat()
         committed_filenames = []
 
@@ -342,10 +296,51 @@ class DatabaseManager:
             fn = meta["filename"]
             meta["recorded_time"] = commit_time
             meta["updated_at"] = commit_time
-            meta["is_session_finalized"] = True
+            meta["file_size_bytes"] = len(mp3_bytes)
+            meta["audio_format"] = "mp3"
+            meta["audio_mime_type"] = "audio/mpeg"
+            meta["status"] = "passed"
 
-            # Persist directly into MongoDB GridFS + recordings collection
-            self.save_recording_to_mongodb(reader_id, meta, mp3_bytes)
+            # Local disk backup
+            local_mp3 = STORAGE_DIR / "mp3" / fn
+            with open(local_mp3, "wb") as f:
+                f.write(mp3_bytes)
+            self._update_local_recordings_json(meta)
+
+            # MongoDB GridFS + recordings collection
+            try:
+                # Remove previous GridFS file if exists
+                old_file = self.recordings_db["fs.files"].find_one({"filename": fn})
+                if old_file:
+                    self.fs.delete(old_file["_id"])
+
+                # Save binary MP3 into GridFS
+                gridfs_id = self.fs.put(
+                    mp3_bytes,
+                    filename=fn,
+                    content_type="audio/mpeg",
+                    reader_id=reader_id,
+                    dialogue_id=meta.get("dialogue_id"),
+                    turn_idx=meta.get("turn_idx"),
+                    recorded_time=commit_time
+                )
+                meta["gridfs_id"] = str(gridfs_id)
+
+                # Save document into recordings collection WITH raw binary audio
+                doc_to_save = dict(meta)
+                doc_to_save.pop("_id", None)
+                doc_to_save["audio_data"] = Binary(mp3_bytes)
+
+                self.recordings_db["recordings"].replace_one(
+                    {"filename": fn},
+                    doc_to_save,
+                    upsert=True
+                )
+                logger.info(f"Successfully recorded '{fn}' into MongoDB 'telesale_recordings_db' (GridFS + recordings doc)!")
+            except Exception as e:
+                logger.error(f"Failed to write '{fn}' to MongoDB: {e}")
+                raise RuntimeError(f"Lỗi khi lưu lượt thoại '{fn}' vào MongoDB telesale_recordings_db: {e}")
+
             committed_filenames.append(fn)
 
         # Clean staging directory
@@ -356,7 +351,7 @@ class DatabaseManager:
         except Exception:
             pass
 
-        logger.info(f"Committed all {len(committed_filenames)} recordings for '{reader_id}' to MongoDB at {commit_time}")
+        logger.info(f"Committed all {len(committed_filenames)} recordings for '{reader_id}' to MongoDB telesale_recordings_db at {commit_time}")
 
         return {
             "success": True,
@@ -408,6 +403,9 @@ class DatabaseManager:
 
     def get_recordings_by_reader(self, reader_id: str) -> List[Dict[str, Any]]:
         """Returns all officially saved recordings for a given reader from MongoDB."""
+        if not self.is_connected or self.recordings_db is None:
+            self.connect()
+
         if self.is_connected and self.recordings_db is not None:
             try:
                 # Omit binary audio_data in list query to keep payload lightweight
@@ -428,6 +426,9 @@ class DatabaseManager:
 
     def get_all_recordings(self) -> List[Dict[str, Any]]:
         """Returns all recordings saved in the system from MongoDB."""
+        if not self.is_connected or self.recordings_db is None:
+            self.connect()
+
         if self.is_connected and self.recordings_db is not None:
             try:
                 cursor = self.recordings_db["recordings"].find({}, {"_id": 0, "audio_data": 0})

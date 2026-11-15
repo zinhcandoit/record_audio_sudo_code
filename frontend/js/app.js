@@ -249,6 +249,7 @@ function updateProgressSummary() {
   const total = state.turns.length;
   const passed = state.turns.filter((t) => t.status === "passed").length;
   const recorded = state.turns.filter((t) => t.status === "passed" || t.localAudioBlob).length;
+  const allCommitted = state.turns.every((t) => t.is_committed) && total > 0 && passed === total;
 
   const percent = total > 0 ? Math.round((passed / total) * 100) : 0;
   document.getElementById("progress-bar").style.width = `${percent}%`;
@@ -257,18 +258,35 @@ function updateProgressSummary() {
   const btnConfirm = document.getElementById("btn-confirm-all");
   const bannerSuccess = document.getElementById("all-completed-banner");
 
-  if (passed === total && total > 0) {
-    btnConfirm.classList.add("hidden");
+  if (allCommitted) {
+    btnConfirm.classList.remove("hidden");
+    btnConfirm.disabled = true;
+    btnConfirm.className = "w-full sm:w-auto inline-flex items-center justify-center px-8 py-3 rounded-xl bg-emerald-700 text-white font-bold text-sm shadow-md cursor-default opacity-90";
+    btnConfirm.innerHTML = `
+      <i data-lucide="check-check" class="w-5 h-5 mr-2 text-white"></i>
+      Đã lưu an toàn vào MongoDB (${total}/${total})
+    `;
     bannerSuccess.classList.remove("hidden");
+  } else if (passed === total && total > 0) {
+    btnConfirm.classList.remove("hidden");
+    btnConfirm.disabled = false;
+    btnConfirm.className = "w-full sm:w-auto inline-flex items-center justify-center px-8 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-lg hover:shadow-xl transition transform active:scale-95 animate-pulse cursor-pointer";
+    btnConfirm.innerHTML = `
+      <i data-lucide="upload-cloud" class="w-5 h-5 mr-2 text-white"></i>
+      Lưu toàn bộ vào Database (${total}/${total} đoạn đạt chuẩn)
+    `;
+    bannerSuccess.classList.add("hidden");
   } else {
     btnConfirm.classList.remove("hidden");
+    btnConfirm.disabled = false;
+    btnConfirm.className = "w-full sm:w-auto inline-flex items-center justify-center px-8 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md hover:shadow-lg transition cursor-pointer";
     bannerSuccess.classList.add("hidden");
     btnConfirm.innerHTML = `
       <i data-lucide="check-circle" class="w-5 h-5 mr-2"></i>
       Xác nhận & Kiểm tra toàn bộ (${recorded}/${total} đã thu)
     `;
-    if (window.lucide) lucide.createIcons();
   }
+  if (window.lucide) lucide.createIcons();
 }
 
 // Render Turns Cards
@@ -574,7 +592,39 @@ async function stopRecordingTurn(turnId) {
 async function handleConfirmAndVerify() {
   if (state.isVerifying) return;
 
-  // 1. Check if any turn is missing audio
+  const total = state.turns.length;
+
+  // 1. If all turns are ALREADY verified and passed, user clicked confirm to save to MongoDB!
+  const allAlreadyPassed = state.turns.every((t) => t.status === "passed");
+  if (allAlreadyPassed && total > 0) {
+    openModal("Đang lưu trữ chính thức toàn bộ file MP3 và metadata vào MongoDB...", 1);
+    state.isVerifying = true;
+    try {
+      updateModalProgress(1, 1, "Đang kết nối MongoDB và lưu trữ trọn bộ vào telesale_recordings_db...");
+      const finalRes = await API.finalizeAll(state.currentReaderId);
+      state.turns.forEach((t) => {
+        t.recorded_time = finalRes.recorded_time;
+        t.is_committed = true;
+      });
+      alert(`🎉 Chúc mừng! Đã hoàn tất đủ ${total}/${total} đoạn đạt chuẩn. Toàn bộ file MP3 và metadata đã được lưu an toàn vào MongoDB (telesale_recordings_db)!`);
+      showToast(`🎉 Đã lưu thành công ${total}/${total} đoạn vào MongoDB!`, "success");
+      setTimeout(() => {
+        const banner = document.getElementById("all-completed-banner");
+        if (banner) banner.scrollIntoView({ behavior: "smooth" });
+      }, 300);
+    } catch (err) {
+      alert(`LỖI KHI LƯU VÀO MONGODB:\n${err.message}`);
+      showToast(err.message, "error");
+    } finally {
+      state.isVerifying = false;
+      closeModal();
+      renderTurns();
+      updateProgressSummary();
+    }
+    return;
+  }
+
+  // 2. Check if any turn is missing audio
   const unrecordedTurns = state.turns.filter((t) => !t.locked && !t.localAudioBlob);
   if (unrecordedTurns.length > 0) {
     const missingList = unrecordedTurns
@@ -592,7 +642,7 @@ async function handleConfirmAndVerify() {
     return;
   }
 
-  // 2. Identify turns needing verification
+  // 3. Identify turns needing verification
   const turnsToVerify = state.turns.filter((t) => !t.locked && t.localAudioBlob);
   if (turnsToVerify.length === 0) {
     showToast("Tất cả các đoạn đã được xác nhận đạt chuẩn!", "success");
@@ -651,25 +701,29 @@ async function handleConfirmAndVerify() {
   }
 
   const total = state.turns.length;
-  const allCompleted = state.turns.every((t) => t.status === "passed" || t.status === "re-recorded");
+  const allCompleted = state.turns.every((t) => t.status === "passed");
 
+  // ONLY COMMIT TO MONGODB WHEN ALL N/N TURNS FOR THE ROLE ARE PASSED!
   if (allCompleted && total > 0) {
-    updateModalProgress(total, total, "Đang hoàn tất và cập nhật phiên ghi nhận vào MongoDB...");
+    updateModalProgress(total, total, "Đang lưu trữ chính thức toàn bộ file MP3 và metadata vào MongoDB...");
     try {
       const finalRes = await API.finalizeAll(state.currentReaderId);
       state.turns.forEach((t) => {
         t.recorded_time = finalRes.recorded_time;
+        t.is_committed = true;
       });
-      showToast(`🎉 Chúc mừng! Đã hoàn tất đủ ${total}/${total} đoạn. Toàn bộ file MP3 và metadata đã được lưu trữ an toàn trong MongoDB (telesale_recordings_db)!`, "success");
+      alert(`🎉 Chúc mừng! Đã hoàn tất 100% (${total}/${total} đoạn đạt chuẩn). Toàn bộ file MP3 và metadata đã được lưu an toàn vào MongoDB (telesale_recordings_db)!`);
+      showToast(`🎉 Chúc mừng! Đã hoàn tất 100% (${total}/${total} đoạn đạt chuẩn). Toàn bộ file MP3 và metadata đã được lưu an toàn vào MongoDB!`, "success");
       setTimeout(() => {
         const banner = document.getElementById("all-completed-banner");
         if (banner) banner.scrollIntoView({ behavior: "smooth" });
       }, 300);
     } catch (err) {
+      alert(`LỖI KHI LƯU VÀO MONGODB:\n${err.message}`);
       showToast(err.message, "error");
     }
   } else {
-    showToast(`Đã lưu ${passedCount}/${total} đoạn đạt chuẩn vào MongoDB. Còn ${failedCount} đoạn chưa đạt - bạn có thể bấm "Thu âm lại" hoặc ấn "Tải file .zip" để tải toàn bộ!`, "warning");
+    showToast(`Có ${failedCount} đoạn chưa đạt chuẩn (Score < 85% hoặc WPM < 4). Hệ thống CHƯA LƯU vào Database. Vui lòng thu âm lại các đoạn màu đỏ và ấn Xác nhận lại!`, "warning");
   }
 
   state.isVerifying = false;
