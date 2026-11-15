@@ -84,30 +84,34 @@ async def verify_turn(
 
     is_passed = eval_result["passed"]
 
-    # 3. Save to staging (DO NOT SAVE TO MONGODB YET!)
-    # Always save staged MP3 and metadata so the user can download .zip with the given
-    # naming convention even if Whisper hallucinated or some checks failed.
-    # Note: Only committed to MongoDB when ALL N/N turns have status="passed".
-    metadata = {
-        "filename": expected_filename,
-        "reader_id": reader_id,
-        "reader_name": reader_info.get("name"),
-        "dialogue_id": dialogue_id,
-        "turn_idx": turn_idx,
-        "speaker": turn_item["speaker"],
-        "role": turn_item["role"],
-        "gender": turn_item["gender"],
-        "region": turn_item["region"],
-        "ground_truth_text": ground_truth,
-        "asr_transcript": eval_result.get("asr_transcript", ""),
-        "rapidfuzz_score": eval_result.get("score", 0.0),
-        "wpm": eval_result.get("wpm", 0.0),
-        "word_count": eval_result.get("word_count", 0),
-        "duration_seconds": eval_result.get("duration_seconds", duration_sec),
-        "status": "passed" if is_passed else "failed",
-        "reasons": eval_result.get("reasons", [])
-    }
-    db_manager.save_staging_turn(reader_id, metadata, mp3_bytes)
+    # 3. Handle Staging:
+    # If passed -> save to staging.
+    # If failed (needs re-recording) -> MUST DELETE any old staged recording of this turn
+    # to prevent saving .zip from an old failed session!
+    if is_passed:
+        metadata = {
+            "filename": expected_filename,
+            "reader_id": reader_id,
+            "reader_name": reader_info.get("name"),
+            "dialogue_id": dialogue_id,
+            "turn_idx": turn_idx,
+            "speaker": turn_item["speaker"],
+            "role": turn_item["role"],
+            "gender": turn_item["gender"],
+            "region": turn_item["region"],
+            "ground_truth_text": ground_truth,
+            "asr_transcript": eval_result.get("asr_transcript", ""),
+            "rapidfuzz_score": eval_result.get("score", 0.0),
+            "wpm": eval_result.get("wpm", 0.0),
+            "word_count": eval_result.get("word_count", 0),
+            "duration_seconds": eval_result.get("duration_seconds", duration_sec),
+            "status": "passed",
+            "reasons": eval_result.get("reasons", [])
+        }
+        db_manager.save_staging_turn(reader_id, metadata, mp3_bytes)
+    else:
+        # Crucial Requirement 2: Delete old recording for any turn that needs to be re-recorded!
+        db_manager.delete_staging_turn(reader_id, expected_filename)
 
     return {
         "dialogue_id": dialogue_id,
@@ -127,6 +131,16 @@ async def verify_turn(
         "staged": is_passed,
         "audio_url": f"/api/recordings/{expected_filename}" if is_passed else None
     }
+
+
+@router.delete("/turn/{reader_id}/{filename}")
+def delete_turn_recording(reader_id: str, filename: str):
+    """
+    Deletes the staged recording for a specific turn when re-recording is requested.
+    Ensures old failed recordings are completely wiped out.
+    """
+    db_manager.delete_staging_turn(reader_id, filename)
+    return {"success": True, "deleted": filename}
 
 
 @router.post("/finalize/{reader_id}")

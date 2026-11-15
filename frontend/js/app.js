@@ -208,7 +208,20 @@ async function handleDownloadZip() {
     return;
   }
 
-  showToast("Đang chuẩn bị gói nén file .zip cho các bản thu...", "info");
+  const passedTurns = state.turns.filter((t) => t.status === "passed").length;
+  const total = state.turns.length;
+
+  if (passedTurns < total) {
+    const unpassedCount = total - passedTurns;
+    const proceed = confirm(
+      `⚠️ Cảnh báo: Hiện có ${unpassedCount}/${total} đoạn chưa đạt chuẩn hoặc cần thu lại (các bản thu cũ không đạt đã bị xóa sạch khỏi hệ thống).\n\n` +
+      `File .zip tải về lúc này sẽ CHỈ CHỨA ${passedTurns}/${total} đoạn đã đạt chuẩn.\n\n` +
+      `Bạn có chắc chắn muốn tải về không?`
+    );
+    if (!proceed) return;
+  }
+
+  showToast(`Đang chuẩn bị gói nén file .zip (${passedTurns}/${total} đoạn)...`, "info");
   const downloadUrl = API.getZipExportUrl(state.currentReaderId);
 
   try {
@@ -226,7 +239,7 @@ async function handleDownloadZip() {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(blobUrl);
-    showToast("Đã tải file .zip thành công!", "success");
+    showToast(`Đã tải file .zip thành công (${passedTurns}/${total} đoạn)!`, "success");
   } catch (err) {
     showToast(`Lỗi tải ZIP: ${err.message}`, "error");
   }
@@ -459,6 +472,31 @@ async function startRecordingTurn(turnId) {
   const turn = state.turns.find((t) => t.id === turnId);
   if (!turn || turn.locked) return;
 
+  // PHẢI XÓA BẢN THU ÂM CŨ CỦA ĐOẠN NÀY ĐỂ TRÁNH LƯU SESSION LỖI
+  if (turn.localAudioUrl) {
+    try { URL.revokeObjectURL(turn.localAudioUrl); } catch {}
+  }
+  turn.localAudioBlob = null;
+  turn.localAudioUrl = null;
+  turn.audio_url = null;
+  turn.duration = 0;
+  turn.status = "recording";
+  turn.reasons = [];
+
+  // Hide audio player
+  const playerContainer = document.getElementById(`player-container-${turnId}`);
+  if (playerContainer) {
+    playerContainer.classList.add("hidden");
+    const audioElem = document.getElementById(`audio-${turnId}`);
+    if (audioElem) {
+      audioElem.pause();
+      audioElem.src = "";
+    }
+  }
+
+  // Delete staged audio from backend
+  API.deleteTurnRecording(state.currentReaderId, turn.filename);
+
   const canvas = document.getElementById(`canvas-${turnId}`);
   const timerElem = document.getElementById(`timer-${turnId}`);
   const statusElem = document.getElementById(`rec-status-${turnId}`);
@@ -594,10 +632,26 @@ async function handleConfirmAndVerify() {
       } else {
         turn.status = "failed";
         turn.locked = false;
+        // PHẢI XÓA BẢN THU ÂM CŨ ĐỂ TRÁNH LƯU TỪ SESSION FAIL
+        if (turn.localAudioUrl) {
+          try { URL.revokeObjectURL(turn.localAudioUrl); } catch {}
+        }
+        turn.localAudioBlob = null;
+        turn.localAudioUrl = null;
+        turn.audio_url = null;
+        turn.duration = 0;
         failedCount++;
       }
     } catch (err) {
       turn.status = "failed";
+      turn.locked = false;
+      if (turn.localAudioUrl) {
+        try { URL.revokeObjectURL(turn.localAudioUrl); } catch {}
+      }
+      turn.localAudioBlob = null;
+      turn.localAudioUrl = null;
+      turn.audio_url = null;
+      turn.duration = 0;
       turn.reasons = [err.message];
       failedCount++;
     }

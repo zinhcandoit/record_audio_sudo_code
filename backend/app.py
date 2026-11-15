@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Hệ Thống Thu Âm Telesale & Đánh Giá Giọng Nữ Bắc",
+    title="Hệ Thống Thu Âm Telesale & Thẩm Định ASR",
     description="Ứng dụng thu âm, nhận dạng giọng nói ASR Whisper, tính RapidFuzz và WPM theo chuẩn tiếng Việt",
     version="1.0.0",
     lifespan=lifespan

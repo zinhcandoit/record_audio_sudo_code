@@ -46,6 +46,17 @@ const API = {
     return data;
   },
 
+  async deleteTurnRecording(readerId, filename) {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/verify/turn/${readerId}/${filename}`, {
+        method: "DELETE"
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+
   async finalizeAll(readerId) {
     const res = await fetch(`${this.baseUrl}/api/verify/finalize/${readerId}`, {
       method: "POST"

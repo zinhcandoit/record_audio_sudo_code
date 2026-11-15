@@ -176,6 +176,27 @@ class DatabaseManager:
         with open(meta_file, "w", encoding="utf-8") as f:
             json.dump(metadata, f, ensure_ascii=False, indent=2)
 
+    def delete_staging_turn(self, reader_id: str, filename: str):
+        """
+        Deletes a specific turn from staging (both the .mp3 and the .json metadata).
+        Used when a turn fails verification or needs re-recording to ensure no stale/failed
+        audio remains to be downloaded or packed into ZIP.
+        """
+        staging_dir = STORAGE_DIR / "staging" / reader_id
+        if staging_dir.exists():
+            mp3_file = staging_dir / filename
+            meta_file = staging_dir / f"{filename}.json"
+            if mp3_file.exists():
+                try:
+                    mp3_file.unlink()
+                except Exception as e:
+                    logger.warning(f"Failed to delete staged mp3 {mp3_file}: {e}")
+            if meta_file.exists():
+                try:
+                    meta_file.unlink()
+                except Exception as e:
+                    logger.warning(f"Failed to delete staged meta {meta_file}: {e}")
+
     def get_staging_turns(self, reader_id: str) -> Dict[str, Dict[str, Any]]:
         """Returns all currently staged turns for this reader."""
         staging_dir = STORAGE_DIR / "staging" / reader_id
@@ -378,22 +399,24 @@ class DatabaseManager:
 
     def get_all_available_recordings_for_reader(self, reader_id: str) -> List[Dict[str, Any]]:
         """
-        Returns all recordings for reader, prioritizing officially committed ones,
-        and including staged recordings (from verification) so that the user can download
-        the ZIP even if Whisper hallucinated or verification failed some turns.
+        Returns all valid recordings for reader. Any turn that failed or needs re-recording
+        is strictly excluded so that users cannot export audio from a failed session.
         """
         recordings_map = {}
 
-        # 1. Committed recordings from MongoDB or local storage
+        # 1. Committed recordings from MongoDB or local storage (always status='passed')
         committed = self.get_recordings_by_reader(reader_id)
         for c in committed:
-            recordings_map[c["filename"]] = c
+            if c.get("status") == "passed":
+                recordings_map[c["filename"]] = c
 
-        # 2. Staged recordings (from ASR verification)
+        # 2. Staged recordings (from ASR verification) - STRICTLY ONLY PASSED TURNS!
         staged = self.get_staging_turns(reader_id)
         for fn, meta in staged.items():
             if fn not in recordings_map:
-                recordings_map[fn] = meta
+                # Exclude any turn that did not pass verification
+                if meta.get("status") == "passed":
+                    recordings_map[fn] = meta
 
         # Sort by filename
         return sorted(recordings_map.values(), key=lambda x: x.get("filename", ""))
