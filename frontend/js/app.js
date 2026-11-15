@@ -117,7 +117,7 @@ async function loadReaders() {
   readers.forEach((r) => {
     const opt = document.createElement("option");
     opt.value = r.id;
-    opt.textContent = `${r.name} - ${r.role_description} (${r.completed_turns}/${r.total_turns} hoàn thành)`;
+    opt.textContent = `${r.name} - ${r.role_description} (${r.total_turns} câu thoại)`;
     select.appendChild(opt);
   });
 }

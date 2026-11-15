@@ -256,10 +256,9 @@ class DatabaseManager:
         total_required = len(assigned_turns)
         staging_dir = STORAGE_DIR / "staging" / reader_id
 
-        # 2. Gather all N turns (from staging or existing MongoDB recordings)
+        # 2. Gather all N turns from staging (current session only, no DB reading)
         staged_items = []
         missing = []
-        existing_in_db = {r["filename"]: r for r in self.get_recordings_by_reader(reader_id)}
 
         for t in assigned_turns:
             fn = t["filename"]
@@ -278,11 +277,6 @@ class DatabaseManager:
                             meta = json.load(f)
                     except Exception:
                         pass
-
-            # If not in staging, check if already in MongoDB / local storage
-            if not mp3_bytes and fn in existing_in_db:
-                meta = existing_in_db[fn]
-                mp3_bytes = self.get_recording_audio(fn)
 
             if not mp3_bytes or not meta:
                 missing.append(fn)
@@ -304,6 +298,7 @@ class DatabaseManager:
             fn = meta["filename"]
             meta["recorded_time"] = commit_time
             meta["updated_at"] = commit_time
+            meta["session_timestamp"] = commit_time
             meta["file_size_bytes"] = len(mp3_bytes)
             meta["audio_format"] = "mp3"
             meta["audio_mime_type"] = "audio/mpeg"
@@ -317,12 +312,7 @@ class DatabaseManager:
 
             # MongoDB GridFS + recordings collection
             try:
-                # Remove previous GridFS file if exists
-                old_file = self.recordings_db["fs.files"].find_one({"filename": fn})
-                if old_file:
-                    self.fs.delete(old_file["_id"])
-
-                # Save binary MP3 into GridFS
+                # Save binary MP3 into GridFS (preserving all takes across sessions)
                 gridfs_id = self.fs.put(
                     mp3_bytes,
                     filename=fn,
@@ -339,12 +329,9 @@ class DatabaseManager:
                 doc_to_save.pop("_id", None)
                 doc_to_save["audio_data"] = Binary(mp3_bytes)
 
-                self.recordings_db["recordings"].replace_one(
-                    {"filename": fn},
-                    doc_to_save,
-                    upsert=True
-                )
-                logger.info(f"Successfully recorded '{fn}' into MongoDB 'telesale_recordings_db' (GridFS + recordings doc)!")
+                # Insert as a new session take to allow multiple voice recordings to coexist
+                self.recordings_db["recordings"].insert_one(doc_to_save)
+                logger.info(f"Successfully recorded '{fn}' into MongoDB 'telesale_recordings_db' (session: {commit_time})!")
             except Exception as e:
                 logger.error(f"Failed to write '{fn}' to MongoDB: {e}")
                 raise RuntimeError(f"Lỗi khi lưu lượt thoại '{fn}' vào MongoDB telesale_recordings_db: {e}")
@@ -383,23 +370,28 @@ class DatabaseManager:
             logger.error(f"Error updating local recordings JSON: {e}")
 
     def get_recording_audio(self, filename: str) -> Optional[bytes]:
-        """Fetches MP3 bytes from MongoDB GridFS, document audio_data, staging, or local storage."""
-        # 1. Check MongoDB document audio_data or GridFS
+        """Fetches MP3 bytes from staging first (current session take), then MongoDB GridFS, document audio_data, or local storage."""
+        # 1. Check staging directory first (current session recording)
+        staging_root = STORAGE_DIR / "staging"
+        if staging_root.exists():
+            for staging_reader_dir in staging_root.glob("*"):
+                staged_file = staging_reader_dir / filename
+                if staged_file.exists():
+                    try:
+                        with open(staged_file, "rb") as f:
+                            return f.read()
+                    except Exception:
+                        pass
+
+        # 2. Check MongoDB document audio_data or GridFS
         if self.is_connected and self.recordings_db is not None:
-            doc = self.recordings_db["recordings"].find_one({"filename": filename}, {"audio_data": 1})
+            doc = self.recordings_db["recordings"].find_one({"filename": filename}, {"audio_data": 1}, sort=[("recorded_time", -1)])
             if doc and "audio_data" in doc and doc["audio_data"]:
                 return bytes(doc["audio_data"])
             if self.fs is not None:
-                grid_out = self.fs.find_one({"filename": filename})
+                grid_out = self.fs.find_one({"filename": filename}, sort=[("uploadDate", -1)])
                 if grid_out:
                     return grid_out.read()
-
-        # 2. Check staging directory (for previewing during verification)
-        for staging_reader_dir in (STORAGE_DIR / "staging").glob("*"):
-            staged_file = staging_reader_dir / filename
-            if staged_file.exists():
-                with open(staged_file, "rb") as f:
-                    return f.read()
 
         # 3. Check permanent local storage
         local_path = STORAGE_DIR / "mp3" / filename
