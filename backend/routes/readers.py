@@ -10,11 +10,17 @@ router = APIRouter(prefix="/api/readers", tags=["Readers"])
 def list_readers():
     """Returns available readers (Nữ 1, Nữ 2, etc.) and summary counts."""
     readers = db_manager.get_readers()
+    all_recordings = db_manager.get_all_recordings()
+    recordings_by_reader = {}
+    for rec in all_recordings:
+        if rec.get("status") == "passed":
+            rid = rec.get("reader_id")
+            recordings_by_reader[rid] = recordings_by_reader.get(rid, 0) + 1
+
     result = []
     for r in readers:
         reader_id = r["id"]
-        recordings = db_manager.get_recordings_by_reader(reader_id)
-        passed_count = len(recordings)
+        passed_count = recordings_by_reader.get(reader_id, 0)
         total_count = len(r.get("turns", []))
         result.append({
             "id": reader_id,

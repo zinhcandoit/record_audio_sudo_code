@@ -27,6 +27,7 @@ class DatabaseManager:
         self.fs = None
         self.is_connected = False
         self.connection_error = None
+        self._last_connect_time = 0
 
         self.local_recordings_file = STORAGE_DIR / "recordings.json"
         self._init_local_storage()
@@ -42,16 +43,23 @@ class DatabaseManager:
     def get_public_ip(self) -> str:
         try:
             import requests
-            resp = requests.get("https://api.ipify.org", timeout=3)
+            resp = requests.get("https://api.ipify.org", timeout=2)
             if resp.status_code == 200:
                 return resp.text.strip()
         except Exception:
             pass
         return "Unknown"
 
-    def connect(self) -> bool:
-        """Attempts to connect to MongoDB with automatic fallbacks."""
+    def connect(self, force: bool = False) -> bool:
+        """Attempts to connect to MongoDB with automatic fallbacks and time throttling."""
         import os
+        import time
+
+        now = time.time()
+        if not force and not self.is_connected and (now - getattr(self, "_last_connect_time", 0)) < 8:
+            return False
+        self._last_connect_time = now
+
         uri = os.getenv("MONGODB_URI", MONGODB_URI)
         if uri:
             uri = uri.strip().strip("'\"")
@@ -222,7 +230,7 @@ class DatabaseManager:
         # 1. ALWAYS ENSURE ACTIVE CONNECTION TO MONGODB!
         if not self.is_connected or self.client is None or self.recordings_db is None or self.fs is None:
             logger.info("Connecting to MongoDB before committing session...")
-            self.connect()
+            self.connect(force=True)
 
         if not self.is_connected or self.recordings_db is None or self.fs is None:
             raise RuntimeError(
@@ -236,7 +244,7 @@ class DatabaseManager:
             self.client.admin.command("ping")
         except Exception as e:
             logger.warning(f"MongoDB ping failed: {e}. Reconnecting...")
-            self.connect()
+            self.connect(force=True)
             if not self.is_connected or self.recordings_db is None or self.fs is None:
                 raise RuntimeError(f"LỖI KẾT NỐI MONGODB: Mất kết nối tới database: {e}")
 

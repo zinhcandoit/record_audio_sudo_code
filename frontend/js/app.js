@@ -21,9 +21,10 @@ function formatTime(seconds) {
 // Initialize Application
 document.addEventListener("DOMContentLoaded", async () => {
   try {
-    await loadSystemStatus();
+    loadSystemStatus();
     await loadReaders();
-    await selectReader("nu_1");
+    const defaultId = state.readers.length > 0 ? state.readers[0].id : "nu_1";
+    await selectReader(defaultId);
   } catch (err) {
     console.error("Initialization error:", err);
     showToast(err.message, "error");
@@ -700,7 +701,6 @@ async function handleConfirmAndVerify() {
     }
   }
 
-  const total = state.turns.length;
   const allCompleted = state.turns.every((t) => t.status === "passed");
 
   // ONLY COMMIT TO MONGODB WHEN ALL N/N TURNS FOR THE ROLE ARE PASSED!
