@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full bg-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thu Âm Telesale - Giọng Nữ Bắc 1 & Nữ Bắc 2</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="h-full flex flex-col text-slate-800 antialiased">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md">
+          <i data-lucide="mic-2" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="text-base font-bold text-slate-900 leading-tight">
+            Hệ Thống Thu Âm Telesale ASR
+          </h1>
+          <p class="text-xs text-slate-500">Giọng Nữ Bắc 1 & Nữ Bắc 2 (OpenAI Whisper + RapidFuzz + WPM)</p>
+        </div>
+      </div>
+
+      <!-- System Status Indicators -->
+      <div class="hidden sm:flex items-center space-x-2">
+        <span id="status-mongo" class="badge bg-slate-100 text-slate-600 border border-slate-200">
+          ● MongoDB: Đang kiểm tra...
+        </span>
+        <span id="status-whisper" class="badge bg-slate-100 text-slate-600 border border-slate-200">
+          ● OpenAI Whisper: Đang kiểm tra...
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-28">
+
+    <!-- Selector & Summary Card -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div>
+          <label for="reader-select" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+            1. Chọn Giọng / Người Thu Âm:
+          </label>
+          <div class="relative inline-block w-full sm:w-96">
+            <select id="reader-select" class="w-full bg-slate-50 border-2 border-indigo-200 rounded-xl py-2.5 px-4 font-semibold text-indigo-950 focus:outline-none focus:border-indigo-600 focus:bg-white transition cursor-pointer appearance-none pr-10">
+              <!-- Dynamically populated -->
+            </select>
+            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-indigo-600">
+              <i data-lucide="chevron-down" class="w-5 h-5"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="flex items-center space-x-3">
+          <a id="btn-download-zip" href="#" class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg text-slate-700 bg-slate-100 hover:bg-slate-200 transition">
+            <i data-lucide="download" class="w-4 h-4 mr-2"></i> Tải file ZIP
+          </a>
+          <button id="btn-reset-reader" class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg text-rose-600 hover:bg-rose-50 transition" title="Xóa các bản thu để thu lại từ đầu">
+            <i data-lucide="trash-2" class="w-4 h-4 mr-1"></i> Làm mới
+          </button>
+        </div>
+      </div>
+
+      <!-- Reader Profile Info -->
+      <div class="bg-gradient-to-r from-indigo-50/60 to-violet-50/60 rounded-xl p-4 border border-indigo-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 id="reader-title" class="text-lg font-bold text-slate-900">Nữ 1 (Bắc)</h2>
+          <p id="reader-desc" class="text-sm text-slate-600 mt-0.5">Khách ở D01 và D02 (cùng một người)</p>
+          <div class="flex items-center gap-3 mt-2 text-xs font-medium text-slate-500">
+            <span>Giới tính: <strong id="reader-meta-gender" class="text-slate-800">Nữ</strong></span>
+            <span>•</span>
+            <span>Vùng miền: <strong id="reader-meta-region" class="text-slate-800">Bắc</strong></span>
+            <span>•</span>
+            <span>Chuẩn đặt tên: <code class="bg-indigo-100/70 text-indigo-800 px-1.5 py-0.5 rounded font-mono">D&lt;XX&gt;_YY_f_bac_&lt;vai&gt;.mp3</code></span>
+          </div>
+        </div>
+
+        <!-- Progress Mini Stats -->
+        <div class="min-w-[200px]">
+          <div class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+            <span>Tiến độ hoàn tất</span>
+            <span id="progress-text">0/0 đoạn</span>
+          </div>
+          <div class="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+            <div id="progress-bar" class="bg-indigo-600 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Celebration Banner (Shown when all turns passed) -->
+    <div id="all-completed-banner" class="hidden bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-6 shadow-sm mb-6 text-center">
+      <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3">
+        <i data-lucide="award" class="w-8 h-8"></i>
+      </div>
+      <h3 class="text-xl font-bold text-emerald-950 mb-1">
+        Chúc mừng! Bạn đã hoàn tất toàn bộ các đoạn thu âm!
+      </h3>
+      <p class="text-sm text-emerald-800 max-w-xl mx-auto mb-4">
+        Tất cả các bản thu âm đã vượt qua kiểm tra chất lượng (Score RapidFuzz ≥ 85% & WPM ≥ 4). Toàn bộ file MP3 đã được lưu vào MongoDB GridFS và hệ thống lưu trữ.
+      </p>
+      <a href="/api/recordings/export/zip" class="inline-flex items-center px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-md transition">
+        <i data-lucide="archive" class="w-5 h-5 mr-2"></i> Tải trọn bộ Audio MP3 (.ZIP)
+      </a>
+    </div>
+
+    <!-- List of Turns to Record -->
+    <div class="space-y-4" id="turns-container">
+      <!-- Dynamically populated cards -->
+    </div>
+
+  </main>
+
+  <!-- Sticky Bottom Bar -->
+  <footer class="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200 py-3.5 px-6 z-20 shadow-lg">
+    <div class="max-w-6xl mx-auto flex items-center justify-between gap-4">
+      <div class="text-xs text-slate-500 hidden sm:block">
+        <span class="font-medium text-slate-700">Quy chuẩn kiểm tra:</span>
+        <span class="ml-1">Thu âm đủ 100% lượt • RapidFuzz ≥ 0.85 (85%) • WPM ≥ 4.0 (Tiếng Việt)</span>
+      </div>
+
+      <button id="btn-confirm-all" class="w-full sm:w-auto inline-flex items-center justify-center px-8 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md hover:shadow-lg transition">
+        <i data-lucide="check-circle" class="w-5 h-5 mr-2"></i>
+        Xác nhận & Kiểm tra toàn bộ
+      </button>
+    </div>
+  </footer>
+
+  <!-- Progress Verification Modal -->
+  <div id="progress-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 text-center">
+      <div class="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-bounce">
+        <i data-lucide="cpu" class="w-7 h-7"></i>
+      </div>
+      <h3 id="modal-title" class="text-lg font-bold text-slate-900 mb-1">
+        Đang kiểm tra ASR & Đánh giá chất lượng
+      </h3>
+      <p id="modal-status" class="text-sm text-slate-600 mb-4">
+        Đang gửi âm thanh tới OpenAI Whisper API...
+      </p>
+
+      <!-- Progress bar in modal -->
+      <div class="w-full bg-slate-100 rounded-full h-3 mb-2 overflow-hidden border border-slate-200">
+        <div id="modal-bar" class="bg-indigo-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+
+      <div class="text-xs font-semibold text-slate-500">
+        Tiến trình: <span id="modal-current" class="text-indigo-600">0</span> / <span id="modal-total">0</span> đoạn
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="fixed top-20 right-6 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+  <!-- Scripts -->
+  <script src="/static/js/audio_recorder.js"></script>
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
+

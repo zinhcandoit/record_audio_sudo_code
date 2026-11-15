@@ -1,0 +1,378 @@
+[
+  {
+    "id": "nu_1",
+    "name": "Nữ 1 (Bắc)",
+    "gender": "f",
+    "region": "bac",
+    "role_description": "Khách ở D01 và D02 (cùng một người)",
+    "turns": [
+      {
+        "dialogue_id": "D01",
+        "turn_idx": 2,
+        "speaker": "C",
+        "role": "customer",
+        "gender": "f",
+        "region": "bac",
+        "text": "alo, chị muốn hỏi máy lọc không khí cho phòng ngủ, phòng chị khoảng hai mươi lăm mét vuông",
+        "filename": "D01_02_f_bac_customer.mp3"
+      },
+      {
+        "dialogue_id": "D01",
+        "turn_idx": 4,
+        "speaker": "C",
+        "role": "customer",
+        "gender": "f",
+        "region": "bac",
+        "text": "có, nhà chị có bé hai tuổi, ngân sách tầm năm triệu thôi em",
+        "filename": "D01_04_f_bac_customer.mp3"
+      },
+      {
+        "dialogue_id": "D01",
+        "turn_idx": 6,
+        "speaker": "C",
+        "role": "customer",
+        "gender": "f",
+        "region": "bac",
+        "text": "hơi vượt ngân sách chị chút, còn mẫu x thì bao nhiêu",
+        "filename": "D01_06_f_bac_customer.mp3"
+      },
+      {
+        "dialogue_id": "D01",
+        "turn_idx": 8,
+        "speaker": "C",
+        "role": "customer",
+        "gender": "f",
+        "region": "bac",
+        "text": "ừ để chị hỏi ông xã rồi gọi lại em nhé",
+        "filename": "D01_08_f_bac_customer.mp3"
+      },
+      {
+        "dialogue_id": "D01",
+        "turn_idx": 10,
+        "speaker": "C",
+        "role": "customer",
+        "gender": "f",
+        "region": "bac",
+        "text": "ừ chiều mai gọi chị, số này luôn nhé",
+        "filename": "D01_10_f_bac_customer.mp3"
+      },
+      {
+        "dialogue_id": "D02",
+        "turn_idx": 1,
+        "speaker": "C",
+        "role": "customer",
+        "gender": "f",
+        "region": "bac",
+        "text": "alo, hôm trước anh có gọi hỏi máy lọc không khí bên em đó",
+        "filename": "D02_01_f_bac_customer.mp3"
+      },
+      {
+        "dialogue_id": "D02",
+        "turn_idx": 3,
+        "speaker": "C",
+        "role": "customer",
+        "gender": "f",
+        "region": "bac",
+        "text": "rồi, bà xã anh ok rồi, giá vẫn vậy đúng không em",
+        "filename": "D02_03_f_bac_customer.mp3"
+      },
+      {
+        "dialogue_id": "D02",
+        "turn_idx": 5,
+        "speaker": "C",
+        "role": "customer",
+        "gender": "f",
+        "region": "bac",
+        "text": "ừ lên đơn cho anh đi, giao về địa chỉ cũ, thanh toán khi nhận hàng",
+        "filename": "D02_05_f_bac_customer.mp3"
+      },
+      {
+        "dialogue_id": "D02",
+        "turn_idx": 7,
+        "speaker": "C",
+        "role": "customer",
+        "gender": "f",
+        "region": "bac",
+        "text": "đúng rồi em",
+        "filename": "D02_07_f_bac_customer.mp3"
+      }
+    ]
+  },
+  {
+    "id": "nu_2",
+    "name": "Nữ 2 (Bắc)",
+    "gender": "f",
+    "region": "bac",
+    "role_description": "Tư vấn viên D01, D03 · Khách D04",
+    "turns": [
+      {
+        "dialogue_id": "D01",
+        "turn_idx": 1,
+        "speaker": "A",
+        "role": "agent",
+        "gender": "f",
+        "region": "bac",
+        "text": "dạ shop bê tê xê xin nghe, em có thể giúp gì cho mình ạ",
+        "filename": "D01_01_f_bac_agent.mp3"
+      },
+      {
+        "dialogue_id": "D01",
+        "turn_idx": 3,
+        "speaker": "A",
+        "role": "agent",
+        "gender": "f",
+        "region": "bac",
+        "text": "dạ phòng hai mươi lăm mét thì bên em có hai mẫu phù hợp là e pia x và e pia y ạ, nhà mình có bé nhỏ không chị",
+        "filename": "D01_03_f_bac_agent.mp3"
+      },
+      {
+        "dialogue_id": "D01",
+        "turn_idx": 5,
+        "speaker": "A",
+        "role": "agent",
+        "gender": "f",
+        "region": "bac",
+        "text": "dạ vậy em gợi ý mẫu e pia y có khóa trẻ em, giá năm triệu hai trăm nghìn, đang có khuyến mãi tặng một màng lọc đến hết ngày hai mươi hai tháng mười ạ",
+        "filename": "D01_05_f_bac_agent.mp3"
+      },
+      {
+        "dialogue_id": "D01",
+        "turn_idx": 7,
+        "speaker": "A",
+        "role": "agent",
+        "gender": "f",
+        "region": "bac",
+        "text": "dạ mẫu x là bốn triệu tám trăm chín mươi nghìn, cũng được tặng màng lọc, nhưng không có khóa trẻ em chị ạ",
+        "filename": "D01_07_f_bac_agent.mp3"
+      },
+      {
+        "dialogue_id": "D01",
+        "turn_idx": 9,
+        "speaker": "A",
+        "role": "agent",
+        "gender": "f",
+        "region": "bac",
+        "text": "dạ vâng, em ghi nhận, mai hoặc ngày kia em gọi lại chị được không ạ",
+        "filename": "D01_09_f_bac_agent.mp3"
+      },
+      {
+        "dialogue_id": "D03",
+        "turn_idx": 2,
+        "speaker": "A",
+        "role": "agent",
+        "gender": "f",
+        "region": "bac",
+        "text": "dạ máy ka rô phi chín lõi bên em giá năm triệu chín trăm chín mươi nghìn, bảo hành ba mươi sáu tháng ạ",
+        "filename": "D03_02_f_bac_agent.mp3"
+      },
+      {
+        "dialogue_id": "D03",
+        "turn_idx": 4,
+        "speaker": "A",
+        "role": "agent",
+        "gender": "f",
+        "region": "bac",
+        "text": "dạ bên em bảo hành ba năm thân máy, giao lắp tận nơi và đổi trả trong bảy ngày ạ, em không so được giá bên khác nhưng giá bên em là giá niêm yết chính hãng",
+        "filename": "D03_04_f_bac_agent.mp3"
+      },
+      {
+        "dialogue_id": "D03",
+        "turn_idx": 6,
+        "speaker": "A",
+        "role": "agent",
+        "gender": "f",
+        "region": "bac",
+        "text": "dạ đơn từ hai triệu được miễn phí vận chuyển, hàng cồng kềnh ngoài nội thành phụ thu ba mươi nghìn thôi ạ",
+        "filename": "D03_06_f_bac_agent.mp3"
+      },
+      {
+        "dialogue_id": "D03",
+        "turn_idx": 8,
+        "speaker": "A",
+        "role": "agent",
+        "gender": "f",
+        "region": "bac",
+        "text": "dạ vâng, số của anh là không chín một bảy hai hai ba bốn năm sáu đúng không ạ, em lưu lại để gọi lại anh",
+        "filename": "D03_08_f_bac_agent.mp3"
+      },
+      {
+        "dialogue_id": "D04",
+        "turn_idx": 1,
+        "speaker": "C",
+        "role": "customer",
+        "gender": "f",
+        "region": "bac",
+        "text": "alo, chị mới nhận giày hôm qua mà size bốn mươi hơi chật em ạ",
+        "filename": "D04_01_f_bac_customer.mp3"
+      },
+      {
+        "dialogue_id": "D04",
+        "turn_idx": 3,
+        "speaker": "C",
+        "role": "customer",
+        "gender": "f",
+        "region": "bac",
+        "text": "ừ, đổi lên bốn mươi mốt, có mất phí gì không",
+        "filename": "D04_03_f_bac_customer.mp3"
+      },
+      {
+        "dialogue_id": "D04",
+        "turn_idx": 5,
+        "speaker": "C",
+        "role": "customer",
+        "gender": "f",
+        "region": "bac",
+        "text": "ừ",
+        "filename": "D04_05_f_bac_customer.mp3"
+      },
+      {
+        "dialogue_id": "D04",
+        "turn_idx": 7,
+        "speaker": "C",
+        "role": "customer",
+        "gender": "f",
+        "region": "bac",
+        "text": "ok em, cảm ơn em nhé",
+        "filename": "D04_07_f_bac_customer.mp3"
+      }
+    ]
+  },
+  {
+    "id": "nu_3",
+    "name": "Nữ 3 (Nam)",
+    "gender": "f",
+    "region": "nam",
+    "role_description": "Tư vấn viên D02, D04",
+    "turns": [
+      {
+        "dialogue_id": "D02",
+        "turn_idx": 2,
+        "speaker": "A",
+        "role": "agent",
+        "gender": "f",
+        "region": "nam",
+        "text": "dạ em chào anh, hôm mười lăm bên em có tư vấn anh mẫu e pia y cho phòng hai mươi lăm mét, giá năm triệu hai trăm nghìn, anh đã trao đổi với nhà mình chưa ạ",
+        "filename": "D02_02_f_nam_agent.mp3"
+      },
+      {
+        "dialogue_id": "D02",
+        "turn_idx": 4,
+        "speaker": "A",
+        "role": "agent",
+        "gender": "f",
+        "region": "nam",
+        "text": "dạ vẫn năm triệu hai trăm nghìn, còn tặng màng lọc, giao nội thành một đến hai ngày làm việc ạ",
+        "filename": "D02_04_f_nam_agent.mp3"
+      },
+      {
+        "dialogue_id": "D02",
+        "turn_idx": 6,
+        "speaker": "A",
+        "role": "agent",
+        "gender": "f",
+        "region": "nam",
+        "text": "dạ em xác nhận lại, một máy e pia y, năm triệu hai trăm nghìn, giao về số bốn mươi lăm đường lê văn sỹ quận ba, thanh toán cê ô đê, đúng không ạ",
+        "filename": "D02_06_f_nam_agent.mp3"
+      },
+      {
+        "dialogue_id": "D02",
+        "turn_idx": 8,
+        "speaker": "A",
+        "role": "agent",
+        "gender": "f",
+        "region": "nam",
+        "text": "dạ mã đơn của anh là ô đê ba trăm mười hai nghìn bốn trăm năm mươi sáu, em cảm ơn anh ạ",
+        "filename": "D02_08_f_nam_agent.mp3"
+      },
+      {
+        "dialogue_id": "D04",
+        "turn_idx": 2,
+        "speaker": "A",
+        "role": "agent",
+        "gender": "f",
+        "region": "nam",
+        "text": "dạ em chào chị, em thấy đơn ô đê năm trăm hai mươi mốt nghìn ba trăm ba mươi tám giày run lai hai pro size bốn mươi màu đen, chị muốn đổi lên size bốn mươi mốt ạ",
+        "filename": "D04_02_f_nam_agent.mp3"
+      },
+      {
+        "dialogue_id": "D04",
+        "turn_idx": 4,
+        "speaker": "A",
+        "role": "agent",
+        "gender": "f",
+        "region": "nam",
+        "text": "dạ đổi size lần đầu bên em miễn phí hoàn toàn, shop chịu phí ship hai chiều ạ, em kiểm tra tồn kho size bốn mươi mốt màu đen chị chờ em chút",
+        "filename": "D04_04_f_nam_agent.mp3"
+      },
+      {
+        "dialogue_id": "D04",
+        "turn_idx": 6,
+        "speaker": "A",
+        "role": "agent",
+        "gender": "f",
+        "region": "nam",
+        "text": "dạ còn hàng ạ, bên vận chuyển sẽ qua lấy đôi cũ trong một đến hai ngày làm việc và giao đôi mới, chị giữ nguyên hộp và tem giúp em nhé",
+        "filename": "D04_06_f_nam_agent.mp3"
+      }
+    ]
+  },
+  {
+    "id": "nam_3",
+    "name": "Nam 3 (Trung)",
+    "gender": "m",
+    "region": "trung",
+    "role_description": "Khách D03",
+    "turns": [
+      {
+        "dialogue_id": "D03",
+        "turn_idx": 1,
+        "speaker": "C",
+        "role": "customer",
+        "gender": "m",
+        "region": "trung",
+        "text": "em ơi máy lọc nước ka rô phi chín lõi bên em giá bao nhiêu",
+        "filename": "D03_01_m_trung_customer.mp3"
+      },
+      {
+        "dialogue_id": "D03",
+        "turn_idx": 3,
+        "speaker": "C",
+        "role": "customer",
+        "gender": "m",
+        "region": "trung",
+        "text": "bên kia anh thấy bán có năm triệu bảy thôi, sao bên em đắt hơn",
+        "filename": "D03_03_m_trung_customer.mp3"
+      },
+      {
+        "dialogue_id": "D03",
+        "turn_idx": 5,
+        "speaker": "C",
+        "role": "customer",
+        "gender": "m",
+        "region": "trung",
+        "text": "thế lắp đặt có mất phí không",
+        "filename": "D03_05_m_trung_customer.mp3"
+      },
+      {
+        "dialogue_id": "D03",
+        "turn_idx": 7,
+        "speaker": "C",
+        "role": "customer",
+        "gender": "m",
+        "region": "trung",
+        "text": "để anh cân nhắc thêm rồi báo lại",
+        "filename": "D03_07_m_trung_customer.mp3"
+      },
+      {
+        "dialogue_id": "D03",
+        "turn_idx": 9,
+        "speaker": "C",
+        "role": "customer",
+        "gender": "m",
+        "region": "trung",
+        "text": "đúng rồi",
+        "filename": "D03_09_m_trung_customer.mp3"
+      }
+    ]
+  }
+]

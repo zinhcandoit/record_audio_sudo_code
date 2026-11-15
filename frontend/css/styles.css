@@ -1,0 +1,86 @@
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&display=swap');
+
+* {
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Pulsing Recording Indicator */
+@keyframes pulse-red {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+    transform: scale(1.05);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    transform: scale(1);
+  }
+}
+
+.recording-pulse {
+  animation: pulse-red 1.5s infinite;
+}
+
+/* Waveform Canvas Styling */
+.waveform-canvas {
+  width: 100%;
+  height: 64px;
+  border-radius: 10px;
+  background: #000000;
+  border: 1px solid #27272a;
+  display: block;
+}
+
+/* Card Transitions */
+.turn-card {
+  transition: all 0.25s ease-in-out;
+}
+
+.turn-card:hover {
+  transform: translateY(-2px);
+}
+
+.turn-card.locked {
+  border-color: #10b981;
+  background-color: #f0fdf4;
+}
+
+.turn-card.failed {
+  border-color: #f43f5e;
+  background-color: #fff1f2;
+}
+
+.turn-card.has-audio {
+  border-color: #3b82f6;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+}
+

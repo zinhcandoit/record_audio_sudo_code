@@ -1,0 +1,23 @@
+# Environment & Secrets (Không push thông tin nhạy cảm)
+.env
+
+# Python cache & virtual environment
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# Local temporary recordings
+storage/mp3/*
+storage/staging/*
+!storage/mp3/.gitkeep
+!storage/staging/.gitkeep
+storage/recordings.json
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
