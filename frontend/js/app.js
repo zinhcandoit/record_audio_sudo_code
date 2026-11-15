@@ -208,20 +208,19 @@ async function handleDownloadZip() {
     return;
   }
 
-  const passedTurns = state.turns.filter((t) => t.status === "passed").length;
-  const total = state.turns.length;
+  showToast("Đang gom và đóng gói toàn bộ các file âm thanh vào file .zip...", "info");
 
-  if (passedTurns < total) {
-    const unpassedCount = total - passedTurns;
-    const proceed = confirm(
-      `⚠️ Cảnh báo: Hiện có ${unpassedCount}/${total} đoạn chưa đạt chuẩn hoặc cần thu lại (các bản thu cũ không đạt đã bị xóa sạch khỏi hệ thống).\n\n` +
-      `File .zip tải về lúc này sẽ CHỈ CHỨA ${passedTurns}/${total} đoạn đã đạt chuẩn.\n\n` +
-      `Bạn có chắc chắn muốn tải về không?`
-    );
-    if (!proceed) return;
+  // Sync any newly recorded/re-recorded turns to server staging
+  const unStagedTurns = state.turns.filter((t) => t.localAudioBlob && !t.audio_url);
+  for (const t of unStagedTurns) {
+    try {
+      const res = await API.stageTurn(state.currentReaderId, t.dialogue_id, t.turn_idx, t.localAudioBlob);
+      t.audio_url = res.audio_url;
+    } catch (e) {
+      console.warn("Auto-stage error:", e);
+    }
   }
 
-  showToast(`Đang chuẩn bị gói nén file .zip (${passedTurns}/${total} đoạn)...`, "info");
   const downloadUrl = API.getZipExportUrl(state.currentReaderId);
 
   try {
@@ -239,7 +238,7 @@ async function handleDownloadZip() {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(blobUrl);
-    showToast(`Đã tải file .zip thành công (${passedTurns}/${total} đoạn)!`, "success");
+    showToast("Đã tải trọn bộ file .zip thành công!", "success");
   } catch (err) {
     showToast(`Lỗi tải ZIP: ${err.message}`, "error");
   }
@@ -553,6 +552,14 @@ async function stopRecordingTurn(turnId) {
       turn.status = "recorded";
       turn.reasons = [];
 
+      // Auto-stage newly recorded audio to backend so the new take immediately replaces
+      // any old recording in staging and is ready for .zip export
+      API.stageTurn(state.currentReaderId, turn.dialogue_id, turn.turn_idx, result.blob)
+        .then((res) => {
+          turn.audio_url = res.audio_url;
+        })
+        .catch((err) => console.warn("Background staging error:", err));
+
       showToast(`Đã thu âm lượt ${turn.dialogue_id} #${turn.turn_idx}!`, "info");
     }
   } catch (e) {
@@ -632,26 +639,12 @@ async function handleConfirmAndVerify() {
       } else {
         turn.status = "failed";
         turn.locked = false;
-        // PHẢI XÓA BẢN THU ÂM CŨ ĐỂ TRÁNH LƯU TỪ SESSION FAIL
-        if (turn.localAudioUrl) {
-          try { URL.revokeObjectURL(turn.localAudioUrl); } catch {}
-        }
-        turn.localAudioBlob = null;
-        turn.localAudioUrl = null;
-        turn.audio_url = null;
-        turn.duration = 0;
+        turn.audio_url = res.audio_url;
         failedCount++;
       }
     } catch (err) {
       turn.status = "failed";
       turn.locked = false;
-      if (turn.localAudioUrl) {
-        try { URL.revokeObjectURL(turn.localAudioUrl); } catch {}
-      }
-      turn.localAudioBlob = null;
-      turn.localAudioUrl = null;
-      turn.audio_url = null;
-      turn.duration = 0;
       turn.reasons = [err.message];
       failedCount++;
     }

@@ -399,24 +399,33 @@ class DatabaseManager:
 
     def get_all_available_recordings_for_reader(self, reader_id: str) -> List[Dict[str, Any]]:
         """
-        Returns all valid recordings for reader. Any turn that failed or needs re-recording
-        is strictly excluded so that users cannot export audio from a failed session.
+        Returns ALL recorded audio files for the reader (both committed in MongoDB and staged MP3 files).
+        Includes ALL audio clips so that when the ASR model hallucinates on short words (e.g. 'ừ'),
+        the user can download ALL recorded audio files in a single .zip archive.
         """
         recordings_map = {}
 
-        # 1. Committed recordings from MongoDB or local storage (always status='passed')
+        # 1. Committed recordings from MongoDB or local storage
         committed = self.get_recordings_by_reader(reader_id)
         for c in committed:
-            if c.get("status") == "passed":
-                recordings_map[c["filename"]] = c
+            recordings_map[c["filename"]] = c
 
-        # 2. Staged recordings (from ASR verification) - STRICTLY ONLY PASSED TURNS!
+        # 2. Staged recordings (from verification or re-recordings)
         staged = self.get_staging_turns(reader_id)
         for fn, meta in staged.items():
-            if fn not in recordings_map:
-                # Exclude any turn that did not pass verification
-                if meta.get("status") == "passed":
-                    recordings_map[fn] = meta
+            recordings_map[fn] = meta
+
+        # 3. Ensure any .mp3 file physically in staging directory is included
+        staging_dir = STORAGE_DIR / "staging" / reader_id
+        if staging_dir.exists():
+            for mp3_path in staging_dir.glob("*.mp3"):
+                fn = mp3_path.name
+                if fn not in recordings_map:
+                    recordings_map[fn] = {
+                        "filename": fn,
+                        "reader_id": reader_id,
+                        "status": "staged"
+                    }
 
         # Sort by filename
         return sorted(recordings_map.values(), key=lambda x: x.get("filename", ""))

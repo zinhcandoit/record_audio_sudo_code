@@ -27,6 +27,24 @@ const API = {
     return await res.json();
   },
 
+  async stageTurn(readerId, dialogueId, turnIdx, audioBlob) {
+    const formData = new FormData();
+    formData.append("reader_id", readerId);
+    formData.append("dialogue_id", dialogueId);
+    formData.append("turn_idx", turnIdx);
+    formData.append("audio", audioBlob, `${dialogueId}_${turnIdx}.webm`);
+
+    const res = await fetch(`${this.baseUrl}/api/verify/stage-turn`, {
+      method: "POST",
+      body: formData
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || "Lỗi khi lưu bản thu mới vào hệ thống");
+    }
+    return data;
+  },
+
   async verifyTurn(readerId, dialogueId, turnIdx, audioBlob) {
     const formData = new FormData();
     formData.append("reader_id", readerId);

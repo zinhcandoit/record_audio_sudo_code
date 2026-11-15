@@ -85,33 +85,30 @@ async def verify_turn(
     is_passed = eval_result["passed"]
 
     # 3. Handle Staging:
-    # If passed -> save to staging.
-    # If failed (needs re-recording) -> MUST DELETE any old staged recording of this turn
-    # to prevent saving .zip from an old failed session!
-    if is_passed:
-        metadata = {
-            "filename": expected_filename,
-            "reader_id": reader_id,
-            "reader_name": reader_info.get("name"),
-            "dialogue_id": dialogue_id,
-            "turn_idx": turn_idx,
-            "speaker": turn_item["speaker"],
-            "role": turn_item["role"],
-            "gender": turn_item["gender"],
-            "region": turn_item["region"],
-            "ground_truth_text": ground_truth,
-            "asr_transcript": eval_result.get("asr_transcript", ""),
-            "rapidfuzz_score": eval_result.get("score", 0.0),
-            "wpm": eval_result.get("wpm", 0.0),
-            "word_count": eval_result.get("word_count", 0),
-            "duration_seconds": eval_result.get("duration_seconds", duration_sec),
-            "status": "passed",
-            "reasons": eval_result.get("reasons", [])
-        }
-        db_manager.save_staging_turn(reader_id, metadata, mp3_bytes)
-    else:
-        # Crucial Requirement 2: Delete old recording for any turn that needs to be re-recorded!
-        db_manager.delete_staging_turn(reader_id, expected_filename)
+    # ALWAYS save the latest standardized MP3 into staging.
+    # If the user re-recorded a turn because Whisper hallucinated (e.g. 'ừ'),
+    # saving here ensures the NEW audio replaces the OLD audio, and ALL audio files
+    # are preserved for the full .zip export!
+    metadata = {
+        "filename": expected_filename,
+        "reader_id": reader_id,
+        "reader_name": reader_info.get("name"),
+        "dialogue_id": dialogue_id,
+        "turn_idx": turn_idx,
+        "speaker": turn_item["speaker"],
+        "role": turn_item["role"],
+        "gender": turn_item["gender"],
+        "region": turn_item["region"],
+        "ground_truth_text": ground_truth,
+        "asr_transcript": eval_result.get("asr_transcript", ""),
+        "rapidfuzz_score": eval_result.get("score", 0.0),
+        "wpm": eval_result.get("wpm", 0.0),
+        "word_count": eval_result.get("word_count", 0),
+        "duration_seconds": eval_result.get("duration_seconds", duration_sec),
+        "status": "passed" if is_passed else "failed",
+        "reasons": eval_result.get("reasons", [])
+    }
+    db_manager.save_staging_turn(reader_id, metadata, mp3_bytes)
 
     return {
         "dialogue_id": dialogue_id,
@@ -128,8 +125,67 @@ async def verify_turn(
         "asr_transcript": eval_result["asr_transcript"],
         "ground_truth": ground_truth,
         "reasons": eval_result["reasons"],
-        "staged": is_passed,
-        "audio_url": f"/api/recordings/{expected_filename}" if is_passed else None
+        "staged": True,
+        "audio_url": f"/api/recordings/{expected_filename}"
+    }
+
+
+@router.post("/stage-turn")
+async def stage_turn_without_asr(
+    reader_id: str = Form(...),
+    dialogue_id: str = Form(...),
+    turn_idx: int = Form(...),
+    audio: UploadFile = File(...)
+):
+    """
+    Directly converts a newly recorded audio turn to standardized MP3 and saves it to staging,
+    overwriting any old recording for this turn.
+    Ensures that when a user re-records a hallucinating turn (e.g. 'ừ'), the new audio
+    is ready to be packaged into the .zip file immediately.
+    """
+    reader_info = db_manager.get_reader_turns(reader_id)
+    if not reader_info:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy người đọc '{reader_id}'")
+
+    assigned_turns = reader_info.get("turns", [])
+    turn_item = next((t for t in assigned_turns if t["dialogue_id"] == dialogue_id and t["turn_idx"] == turn_idx), None)
+    if not turn_item:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy lượt {dialogue_id} #{turn_idx}")
+
+    expected_filename = turn_item["filename"]
+    raw_audio_bytes = await audio.read()
+
+    try:
+        mp3_bytes, duration_sec = convert_audio_to_mp3(raw_audio_bytes, input_format="webm")
+    except Exception as e:
+        logger.error(f"Error converting audio to MP3: {e}")
+        raise HTTPException(status_code=500, detail=f"Lỗi chuyển đổi âm thanh: {str(e)}")
+
+    metadata = {
+        "filename": expected_filename,
+        "reader_id": reader_id,
+        "reader_name": reader_info.get("name"),
+        "dialogue_id": dialogue_id,
+        "turn_idx": turn_idx,
+        "speaker": turn_item["speaker"],
+        "role": turn_item["role"],
+        "gender": turn_item["gender"],
+        "region": turn_item["region"],
+        "ground_truth_text": turn_item["text"],
+        "asr_transcript": "[Ghi âm lại - Sẵn sàng xuất ZIP]",
+        "rapidfuzz_score": 1.0,
+        "wpm": 4.0,
+        "duration_seconds": duration_sec,
+        "status": "re-recorded",
+        "reasons": []
+    }
+    db_manager.save_staging_turn(reader_id, metadata, mp3_bytes)
+
+    return {
+        "success": True,
+        "filename": expected_filename,
+        "audio_url": f"/api/recordings/{expected_filename}",
+        "duration": duration_sec
     }
 
 
